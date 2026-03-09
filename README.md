@@ -14,8 +14,8 @@
   - 回头次数
   - 全局平均回头时长
   - 全局平均回头间隔
-  - AO12 时长（最近12次回头，去最长去最短的平均时长）
-  - AO12 间隔（最近12次回头，去最长去最短的平均间隔）
+  - AO12 时长（最近12次回头，去掉最长和最短的平均时长）
+  - AO12 间隔（最近12次回头，去掉最长和最短的平均间隔）
   - 最长回头时长
 - **CSV 导出**：上课结束自动生成 CSV 文件，也可手动导出
 - **本地存储**：数据自动备份到浏览器 localStorage
@@ -50,7 +50,8 @@ cd dstimer
 # 直接在浏览器中打开
 open app/index.html        # macOS
 xdg-open app/index.html    # Linux
-start app/index.html        # Windows
+start app\index.html       # Windows (CMD)
+# PowerShell: Invoke-Item app\index.html
 ```
 
 ### 方式三：使用任意 Web 服务器
