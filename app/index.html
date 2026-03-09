@@ -24,6 +24,59 @@
       overflow-x: hidden;
     }
 
+    /* Password overlay */
+    .password-overlay {
+      position: fixed;
+      inset: 0;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .password-overlay h2 {
+      color: #e94560;
+      margin-bottom: 20px;
+      font-size: 1.4em;
+    }
+
+    .password-overlay input {
+      background: #16213e;
+      border: 2px solid #0f3460;
+      color: #e0e0e0;
+      padding: 12px 20px;
+      font-size: 1.2em;
+      border-radius: 8px;
+      text-align: center;
+      width: 200px;
+      outline: none;
+    }
+
+    .password-overlay input:focus {
+      border-color: #e94560;
+    }
+
+    .password-overlay .pw-btn {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 12px 40px;
+      font-size: 1.1em;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 16px;
+      font-weight: bold;
+    }
+
+    .password-overlay .pw-error {
+      color: #e94560;
+      margin-top: 12px;
+      font-size: 0.9em;
+      min-height: 1.2em;
+    }
+
     .header {
       background: #16213e;
       padding: 12px 16px;
@@ -51,7 +104,6 @@
       min-height: calc(100vh - 70px);
     }
 
-    /* Timer area - the touch zone */
     .timer-zone {
       flex: 1;
       display: flex;
@@ -153,7 +205,6 @@
       background: #666;
     }
 
-    /* Stats panel */
     .stats-panel {
       background: #16213e;
       border-top: 2px solid #0f3460;
@@ -193,7 +244,6 @@
       color: #555;
     }
 
-    /* Event list */
     .event-list-header {
       display: flex;
       justify-content: space-between;
@@ -287,7 +337,6 @@
       background: #d63851;
     }
 
-    /* Scrollbar styling */
     .event-list::-webkit-scrollbar {
       width: 4px;
     }
@@ -301,7 +350,6 @@
       border-radius: 2px;
     }
 
-    /* Toast notification */
     .toast {
       position: fixed;
       bottom: 20px;
@@ -322,7 +370,50 @@
       opacity: 1;
     }
 
-    /* Responsive */
+    .server-config {
+      margin-top: 10px;
+      padding: 8px;
+      background: #1a1a2e;
+      border-radius: 8px;
+      border: 1px solid #0f3460;
+      font-size: 0.8em;
+    }
+
+    .server-config label {
+      color: #888;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .server-config input {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      color: #e0e0e0;
+      padding: 6px 10px;
+      border-radius: 4px;
+      width: 100%;
+      font-size: 1em;
+      outline: none;
+    }
+
+    .server-config input:focus {
+      border-color: #e94560;
+    }
+
+    .sync-status {
+      margin-top: 6px;
+      font-size: 0.85em;
+      color: #888;
+    }
+
+    .sync-status.ok {
+      color: #53d769;
+    }
+
+    .sync-status.fail {
+      color: #e94560;
+    }
+
     @media (min-width: 600px) {
       .main-container {
         flex-direction: row;
@@ -355,13 +446,20 @@
 </head>
 <body>
 
+<!-- Password Gate -->
+<div class="password-overlay" id="passwordOverlay">
+  <h2>请输入密码</h2>
+  <input type="password" id="passwordInput" placeholder="输入密码" maxlength="10" autocomplete="off">
+  <button class="pw-btn" id="passwordBtn">确认</button>
+  <div class="pw-error" id="passwordError"></div>
+</div>
+
 <div class="header">
   <h1>回头记录工具</h1>
   <div class="subtitle">课堂观察研究 — 长按屏幕记录回头</div>
 </div>
 
 <div class="main-container">
-  <!-- Timer/Touch Zone -->
   <div class="timer-zone idle" id="timerZone">
     <div class="class-timer" id="classTimerWrap" style="display:none;">
       上课时间: <span class="elapsed" id="classTimer">00:00:00</span>
@@ -375,12 +473,15 @@
     <button class="stop-btn" id="stopBtn" style="display:none;">结束上课</button>
   </div>
 
-  <!-- Stats Panel -->
   <div class="stats-panel" id="statsPanel">
     <div class="stats-grid">
       <div class="stat-card">
         <div class="label">回头次数</div>
         <div class="value" id="statCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">回头系数 (次/分钟)</div>
+        <div class="value na" id="statCoefficient">N/A</div>
       </div>
       <div class="stat-card">
         <div class="label">全局平均回头时长</div>
@@ -428,6 +529,12 @@
       <button class="action-btn export-btn" id="exportCsvBtn">导出 CSV</button>
       <button class="action-btn" id="clearBtn">清空记录</button>
     </div>
+
+    <div class="server-config">
+      <label>后端服务器地址</label>
+      <input type="text" id="serverUrl" placeholder="例如 http://localhost:5000" value="">
+      <div class="sync-status" id="syncStatus">未配置服务器</div>
+    </div>
   </div>
 </div>
 
@@ -437,12 +544,43 @@
 (function() {
   "use strict";
 
+  var PASSWORD = "2427";
+
+  // ====== Password Gate ======
+  var passwordOverlay = document.getElementById("passwordOverlay");
+  var passwordInput = document.getElementById("passwordInput");
+  var passwordBtn = document.getElementById("passwordBtn");
+  var passwordError = document.getElementById("passwordError");
+
+  function checkPassword() {
+    var val = passwordInput.value.trim();
+    if (val === PASSWORD) {
+      passwordOverlay.style.display = "none";
+    } else {
+      passwordError.textContent = "密码错误，请重试";
+      passwordInput.value = "";
+      passwordInput.focus();
+    }
+  }
+
+  passwordBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    checkPassword();
+  });
+
+  passwordInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      checkPassword();
+    }
+  });
+
   // ====== State ======
-  var classStartTime = null;   // timestamp when class started
+  var classStartTime = null;
   var classRunning = false;
-  var isPressing = false;       // whether user is currently pressing
-  var pressStartTime = null;    // timestamp when current press started
-  var events = [];              // [{startOffset, endOffset, duration, interval}]
+  var isPressing = false;
+  var pressStartTime = null;
+  var events = [];
   var classTimerInterval = null;
   var displayInterval = null;
 
@@ -455,6 +593,7 @@
   var startBtn = document.getElementById("startBtn");
   var stopBtn = document.getElementById("stopBtn");
   var statCount = document.getElementById("statCount");
+  var statCoefficient = document.getElementById("statCoefficient");
   var statAvgDuration = document.getElementById("statAvgDuration");
   var statAvgInterval = document.getElementById("statAvgInterval");
   var statAO12Duration = document.getElementById("statAO12Duration");
@@ -465,6 +604,20 @@
   var exportCsvBtn = document.getElementById("exportCsvBtn");
   var clearBtn = document.getElementById("clearBtn");
   var toastEl = document.getElementById("toast");
+  var serverUrlInput = document.getElementById("serverUrl");
+  var syncStatusEl = document.getElementById("syncStatus");
+
+  // Restore saved server URL
+  try {
+    var savedUrl = localStorage.getItem("lookback_server_url");
+    if (savedUrl) serverUrlInput.value = savedUrl;
+  } catch (e) {}
+
+  serverUrlInput.addEventListener("change", function() {
+    try {
+      localStorage.setItem("lookback_server_url", serverUrlInput.value.trim());
+    } catch (e) {}
+  });
 
   // ====== Utility ======
   function formatTime(ms) {
@@ -529,7 +682,6 @@
   }
 
   function stopClass() {
-    // If currently pressing, end it
     if (isPressing) {
       endPress();
     }
@@ -547,10 +699,15 @@
     startBtn.style.display = "inline-block";
     startBtn.textContent = "重新开始";
 
-    // Auto-export CSV
     if (events.length > 0) {
-      exportCSV();
-      showToast("上课结束，CSV 已自动生成");
+      var csvContent = generateCSV();
+      var timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      var filename = "lookback_record_" + timestamp + ".csv";
+
+      downloadCSV(csvContent, filename);
+      uploadCSV(csvContent, filename);
+
+      showToast("上课结束，CSV 已自动生成并上传");
     }
   }
 
@@ -568,7 +725,7 @@
     displayInterval = setInterval(function() {
       var elapsed = Date.now() - pressStartTime;
       mainDisplay.textContent = formatTime(elapsed);
-    }, 33); // ~30fps update
+    }, 33);
   }
 
   function endPress() {
@@ -582,12 +739,11 @@
     var startOffset = pressStartTime - classStartTime;
     var endOffset = now - classStartTime;
 
-    // Calculate interval from end of last event to start of this one
     var interval = 0;
     if (events.length > 0) {
       interval = startOffset - events[events.length - 1].endOffset;
     } else {
-      interval = startOffset; // from class start
+      interval = startOffset;
     }
 
     events.push({
@@ -609,11 +765,9 @@
 
   // ====== Statistics ======
   function calcAO(values, n) {
-    // Average of n, removing best and worst
     if (values.length < n) return -1;
     var last = values.slice(-n);
     last.sort(function(a, b) { return a - b; });
-    // Remove best (first) and worst (last)
     var trimmed = last.slice(1, -1);
     var sum = 0;
     for (var i = 0; i < trimmed.length; i++) {
@@ -628,12 +782,23 @@
     eventCount.textContent = count + " 次";
 
     if (count === 0) {
+      setStatNA("statCoefficient");
       setStatNA("statAvgDuration");
       setStatNA("statAvgInterval");
       setStatNA("statAO12Duration");
       setStatNA("statAO12Interval");
       setStatNA("statMaxDuration");
       return;
+    }
+
+    // Lookback coefficient: lookbacks per minute
+    var elapsedMs = Date.now() - classStartTime;
+    var elapsedMin = elapsedMs / 60000;
+    if (elapsedMin > 0) {
+      var coeff = count / elapsedMin;
+      setStatValue("statCoefficient", coeff.toFixed(2));
+    } else {
+      setStatNA("statCoefficient");
     }
 
     // Global average duration
@@ -664,7 +829,7 @@
     // Max duration
     setStatValue("statMaxDuration", formatTimeShort(maxDur));
 
-    // AO12 Duration (last 12 durations, remove best and worst)
+    // AO12
     var ao12Dur = calcAO(durations, 12);
     if (ao12Dur >= 0) {
       setStatValue("statAO12Duration", formatTimeShort(ao12Dur));
@@ -672,7 +837,6 @@
       setStatNA("statAO12Duration");
     }
 
-    // AO12 Interval (last 12 intervals, remove best and worst)
     var ao12Int = calcAO(intervals, 12);
     if (ao12Int >= 0) {
       setStatValue("statAO12Interval", formatTimeShort(ao12Int));
@@ -720,7 +884,7 @@
     }
   }
 
-  // ====== CSV Export ======
+  // ====== CSV Generation ======
   function generateCSV() {
     var lines = [];
     lines.push("序号,回头开始时间(ms),回头结束时间(ms),回头时长(ms),回头间隔(ms),回头开始时间,回头时长(s),回头间隔(s)");
@@ -738,7 +902,6 @@
       ].join(","));
     }
 
-    // Add summary
     lines.push("");
     lines.push("统计摘要");
     lines.push("回头次数," + events.length);
@@ -753,6 +916,12 @@
         intervals.push(events[j].interval);
         if (events[j].duration > maxDur) maxDur = events[j].duration;
       }
+
+      var totalMs = events[events.length - 1].endOffset;
+      var totalMin = totalMs / 60000;
+      var coeff = totalMin > 0 ? (events.length / totalMin).toFixed(2) : "N/A";
+
+      lines.push("回头系数(次/分钟)," + coeff);
       lines.push("全局平均回头时长(s)," + (sumDur / events.length / 1000).toFixed(3));
       lines.push("全局平均回头间隔(s)," + (sumInt / events.length / 1000).toFixed(3));
       lines.push("最长回头(s)," + (maxDur / 1000).toFixed(3));
@@ -763,25 +932,16 @@
       lines.push("AO12间隔(s)," + (ao12Int >= 0 ? (ao12Int / 1000).toFixed(3) : "N/A"));
 
       lines.push("上课开始时间," + new Date(classStartTime).toLocaleString());
-      lines.push("记录总时长(s)," + ((events[events.length - 1].endOffset) / 1000).toFixed(1));
+      lines.push("记录总时长(s)," + (totalMs / 1000).toFixed(1));
     }
 
     return lines.join("\n");
   }
 
-  function exportCSV() {
-    if (events.length === 0) {
-      showToast("没有记录可导出");
-      return;
-    }
-
-    var csv = generateCSV();
+  // ====== CSV Download ======
+  function downloadCSV(csvContent, filename) {
     var BOM = "\uFEFF";
-    var blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" });
-    var timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    var filename = "lookback_record_" + timestamp + ".csv";
-
-    // Download the file
+    var blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
@@ -790,24 +950,66 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
 
-    // Store to localStorage as a backup
-    try {
-      var records = JSON.parse(localStorage.getItem("lookback_records") || "[]");
-      records.push({
-        timestamp: Date.now(),
-        filename: filename,
-        events: events.slice(),
-        classStartTime: classStartTime
-      });
-      // Keep last 50 records
-      if (records.length > 50) {
-        records = records.slice(-50);
-      }
-      localStorage.setItem("lookback_records", JSON.stringify(records));
-    } catch (e) {
-      // localStorage may not be available
+  // ====== CSV Upload to Backend ======
+  function uploadCSV(csvContent, filename) {
+    var serverUrl = serverUrlInput.value.trim();
+    if (!serverUrl) {
+      syncStatusEl.textContent = "未配置服务器，仅本地导出";
+      syncStatusEl.className = "sync-status";
+      return;
     }
+
+    syncStatusEl.textContent = "正在上传...";
+    syncStatusEl.className = "sync-status";
+
+    var BOM = "\uFEFF";
+    var blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8" });
+    var formData = new FormData();
+    formData.append("file", blob, filename);
+    formData.append("password", PASSWORD);
+
+    var endpoint = serverUrl.replace(/\/+$/, "") + "/api/upload";
+
+    fetch(endpoint, {
+      method: "POST",
+      body: formData
+    })
+    .then(function(resp) {
+      return resp.json().then(function(data) {
+        return { ok: resp.ok, data: data };
+      });
+    })
+    .then(function(result) {
+      if (result.ok) {
+        syncStatusEl.textContent = "上传成功: " + (result.data.filename || "");
+        syncStatusEl.className = "sync-status ok";
+        showToast("CSV 已上传到服务器");
+      } else {
+        syncStatusEl.textContent = "上传失败: " + (result.data.error || "未知错误");
+        syncStatusEl.className = "sync-status fail";
+      }
+    })
+    .catch(function(err) {
+      syncStatusEl.textContent = "上传失败: " + err.message;
+      syncStatusEl.className = "sync-status fail";
+    });
+  }
+
+  // ====== Export CSV (manual) ======
+  function exportCSV() {
+    if (events.length === 0) {
+      showToast("没有记录可导出");
+      return;
+    }
+
+    var csvContent = generateCSV();
+    var timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    var filename = "lookback_record_" + timestamp + ".csv";
+
+    downloadCSV(csvContent, filename);
+    uploadCSV(csvContent, filename);
 
     showToast("CSV 已导出: " + filename);
   }
@@ -846,7 +1048,7 @@
     clearRecords();
   });
 
-  // Touch events for long-press recording
+  // Touch events for long-press recording (passive: false to allow preventDefault)
   timerZone.addEventListener("touchstart", function(e) {
     if (e.target === startBtn || e.target === stopBtn) return;
     e.preventDefault();
@@ -882,7 +1084,6 @@
     }
   });
 
-  // Prevent context menu on long press (mobile)
   timerZone.addEventListener("contextmenu", function(e) {
     e.preventDefault();
   });
