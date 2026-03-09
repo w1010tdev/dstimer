@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>回头记录工具 - 课堂观察研究</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: #16213e;
+      padding: 12px 16px;
+      text-align: center;
+      border-bottom: 2px solid #0f3460;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header h1 {
+      font-size: 1.2em;
+      color: #e94560;
+      margin-bottom: 4px;
+    }
+
+    .header .subtitle {
+      font-size: 0.75em;
+      color: #888;
+    }
+
+    .main-container {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 70px);
+    }
+
+    /* Timer area - the touch zone */
+    .timer-zone {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+      padding: 20px;
+      position: relative;
+      touch-action: none;
+    }
+
+    .timer-zone.idle {
+      background: #1a1a2e;
+    }
+
+    .timer-zone.recording {
+      background: #1a2a1e;
+      cursor: pointer;
+    }
+
+    .timer-zone.pressing {
+      background: #2a1a1e;
+    }
+
+    .class-timer {
+      font-size: 1em;
+      color: #888;
+      margin-bottom: 10px;
+    }
+
+    .class-timer .elapsed {
+      font-size: 1.5em;
+      color: #53d769;
+      font-family: "Courier New", monospace;
+      font-weight: bold;
+    }
+
+    .main-display {
+      font-size: 3.5em;
+      font-family: "Courier New", monospace;
+      font-weight: bold;
+      color: #fff;
+      text-align: center;
+      line-height: 1.2;
+      transition: color 0.15s;
+    }
+
+    .main-display.looking {
+      color: #e94560;
+    }
+
+    .hint-text {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .hint-text.active {
+      color: #e94560;
+      font-weight: bold;
+    }
+
+    .start-btn {
+      background: #e94560;
+      color: white;
+      border: none;
+      padding: 16px 48px;
+      font-size: 1.3em;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s, transform 0.1s;
+      touch-action: manipulation;
+    }
+
+    .start-btn:active {
+      transform: scale(0.96);
+    }
+
+    .start-btn:hover {
+      background: #d63851;
+    }
+
+    .stop-btn {
+      background: #555;
+      color: white;
+      border: none;
+      padding: 10px 30px;
+      font-size: 1em;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+      touch-action: manipulation;
+    }
+
+    .stop-btn:hover {
+      background: #666;
+    }
+
+    /* Stats panel */
+    .stats-panel {
+      background: #16213e;
+      border-top: 2px solid #0f3460;
+      padding: 12px 16px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .stat-card {
+      background: #1a1a2e;
+      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1px solid #0f3460;
+    }
+
+    .stat-card .label {
+      font-size: 0.7em;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-card .value {
+      font-size: 1.3em;
+      font-family: "Courier New", monospace;
+      font-weight: bold;
+      color: #53d769;
+      margin-top: 2px;
+    }
+
+    .stat-card .value.na {
+      color: #555;
+    }
+
+    /* Event list */
+    .event-list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .event-list-header h3 {
+      font-size: 0.9em;
+      color: #aaa;
+    }
+
+    .event-count {
+      font-size: 0.8em;
+      color: #e94560;
+      font-weight: bold;
+    }
+
+    .event-list {
+      max-height: 200px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid #0f3460;
+    }
+
+    .event-list table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8em;
+    }
+
+    .event-list th {
+      background: #0f3460;
+      color: #aaa;
+      padding: 6px 8px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      font-weight: normal;
+      font-size: 0.85em;
+    }
+
+    .event-list td {
+      padding: 5px 8px;
+      text-align: center;
+      border-bottom: 1px solid #0f3460;
+      font-family: "Courier New", monospace;
+    }
+
+    .event-list tr:nth-child(even) {
+      background: rgba(15, 52, 96, 0.3);
+    }
+
+    .event-list tr:last-child td {
+      border-bottom: none;
+    }
+
+    .actions-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      background: #0f3460;
+      color: #ccc;
+      border: 1px solid #1a4a7a;
+      padding: 8px 14px;
+      font-size: 0.8em;
+      border-radius: 6px;
+      cursor: pointer;
+      flex: 1;
+      text-align: center;
+      min-width: 80px;
+      touch-action: manipulation;
+    }
+
+    .action-btn:hover {
+      background: #1a4a7a;
+      color: #fff;
+    }
+
+    .action-btn.export-btn {
+      background: #e94560;
+      border-color: #e94560;
+      color: white;
+    }
+
+    .action-btn.export-btn:hover {
+      background: #d63851;
+    }
+
+    /* Scrollbar styling */
+    .event-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .event-list::-webkit-scrollbar-track {
+      background: #1a1a2e;
+    }
+
+    .event-list::-webkit-scrollbar-thumb {
+      background: #0f3460;
+      border-radius: 2px;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 0.9em;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    /* Responsive */
+    @media (min-width: 600px) {
+      .main-container {
+        flex-direction: row;
+      }
+
+      .timer-zone {
+        flex: 1;
+        min-height: 100vh;
+      }
+
+      .stats-panel {
+        width: 380px;
+        border-top: none;
+        border-left: 2px solid #0f3460;
+        overflow-y: auto;
+        max-height: calc(100vh - 70px);
+      }
+    }
+
+    @media (min-width: 900px) {
+      .stats-panel {
+        width: 450px;
+      }
+
+      .main-display {
+        font-size: 5em;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>回头记录工具</h1>
+  <div class="subtitle">课堂观察研究 — 长按屏幕记录回头</div>
+</div>
+
+<div class="main-container">
+  <!-- Timer/Touch Zone -->
+  <div class="timer-zone idle" id="timerZone">
+    <div class="class-timer" id="classTimerWrap" style="display:none;">
+      上课时间: <span class="elapsed" id="classTimer">00:00:00</span>
+    </div>
+
+    <div class="main-display" id="mainDisplay">00:00.000</div>
+
+    <div class="hint-text" id="hintText">点击下方按钮开始上课</div>
+
+    <button class="start-btn" id="startBtn">开始上课</button>
+    <button class="stop-btn" id="stopBtn" style="display:none;">结束上课</button>
+  </div>
+
+  <!-- Stats Panel -->
+  <div class="stats-panel" id="statsPanel">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">回头次数</div>
+        <div class="value" id="statCount">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">全局平均回头时长</div>
+        <div class="value na" id="statAvgDuration">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">全局平均回头间隔</div>
+        <div class="value na" id="statAvgInterval">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">AO12 时长</div>
+        <div class="value na" id="statAO12Duration">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">AO12 间隔</div>
+        <div class="value na" id="statAO12Interval">N/A</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">最长回头</div>
+        <div class="value na" id="statMaxDuration">N/A</div>
+      </div>
+    </div>
+
+    <div class="event-list-header">
+      <h3>回头事件记录</h3>
+      <span class="event-count" id="eventCount">0 次</span>
+    </div>
+
+    <div class="event-list" id="eventList">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>开始时间</th>
+            <th>回头时长</th>
+            <th>间隔</th>
+          </tr>
+        </thead>
+        <tbody id="eventTableBody">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="actions-bar">
+      <button class="action-btn export-btn" id="exportCsvBtn">导出 CSV</button>
+      <button class="action-btn" id="clearBtn">清空记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ====== State ======
+  var classStartTime = null;   // timestamp when class started
+  var classRunning = false;
+  var isPressing = false;       // whether user is currently pressing
+  var pressStartTime = null;    // timestamp when current press started
+  var events = [];              // [{startOffset, endOffset, duration, interval}]
+  var classTimerInterval = null;
+  var displayInterval = null;
+
+  // ====== DOM Elements ======
+  var timerZone = document.getElementById("timerZone");
+  var classTimerWrap = document.getElementById("classTimerWrap");
+  var classTimerEl = document.getElementById("classTimer");
+  var mainDisplay = document.getElementById("mainDisplay");
+  var hintText = document.getElementById("hintText");
+  var startBtn = document.getElementById("startBtn");
+  var stopBtn = document.getElementById("stopBtn");
+  var statCount = document.getElementById("statCount");
+  var statAvgDuration = document.getElementById("statAvgDuration");
+  var statAvgInterval = document.getElementById("statAvgInterval");
+  var statAO12Duration = document.getElementById("statAO12Duration");
+  var statAO12Interval = document.getElementById("statAO12Interval");
+  var statMaxDuration = document.getElementById("statMaxDuration");
+  var eventCount = document.getElementById("eventCount");
+  var eventTableBody = document.getElementById("eventTableBody");
+  var exportCsvBtn = document.getElementById("exportCsvBtn");
+  var clearBtn = document.getElementById("clearBtn");
+  var toastEl = document.getElementById("toast");
+
+  // ====== Utility ======
+  function formatTime(ms) {
+    if (ms < 0) return "N/A";
+    var totalSeconds = Math.floor(ms / 1000);
+    var minutes = Math.floor(totalSeconds / 60);
+    var seconds = totalSeconds % 60;
+    var millis = ms % 1000;
+    return pad(minutes, 2) + ":" + pad(seconds, 2) + "." + pad(millis, 3);
+  }
+
+  function formatTimeLong(ms) {
+    if (ms < 0) return "N/A";
+    var totalSeconds = Math.floor(ms / 1000);
+    var hours = Math.floor(totalSeconds / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    var seconds = totalSeconds % 60;
+    return pad(hours, 2) + ":" + pad(minutes, 2) + ":" + pad(seconds, 2);
+  }
+
+  function formatTimeShort(ms) {
+    if (ms < 0) return "N/A";
+    var s = (ms / 1000).toFixed(2);
+    return s + "s";
+  }
+
+  function pad(num, size) {
+    var s = String(num);
+    while (s.length < size) s = "0" + s;
+    return s;
+  }
+
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    setTimeout(function() {
+      toastEl.classList.remove("show");
+    }, 2500);
+  }
+
+  // ====== Class Timer ======
+  function startClass() {
+    classStartTime = Date.now();
+    classRunning = true;
+    events = [];
+
+    startBtn.style.display = "none";
+    stopBtn.style.display = "inline-block";
+    classTimerWrap.style.display = "block";
+    timerZone.className = "timer-zone recording";
+    hintText.textContent = "长按屏幕开始记录回头";
+    hintText.className = "hint-text";
+    mainDisplay.textContent = "00:00.000";
+    mainDisplay.className = "main-display";
+
+    updateEventList();
+    updateStats();
+
+    classTimerInterval = setInterval(function() {
+      classTimerEl.textContent = formatTimeLong(Date.now() - classStartTime);
+    }, 500);
+  }
+
+  function stopClass() {
+    // If currently pressing, end it
+    if (isPressing) {
+      endPress();
+    }
+
+    classRunning = false;
+    clearInterval(classTimerInterval);
+    clearInterval(displayInterval);
+    classTimerInterval = null;
+    displayInterval = null;
+
+    timerZone.className = "timer-zone idle";
+    hintText.textContent = "上课已结束，可导出记录";
+    hintText.className = "hint-text";
+    stopBtn.style.display = "none";
+    startBtn.style.display = "inline-block";
+    startBtn.textContent = "重新开始";
+
+    // Auto-export CSV
+    if (events.length > 0) {
+      exportCSV();
+      showToast("上课结束，CSV 已自动生成");
+    }
+  }
+
+  // ====== Press Handling ======
+  function startPress() {
+    if (!classRunning || isPressing) return;
+    isPressing = true;
+    pressStartTime = Date.now();
+
+    timerZone.className = "timer-zone pressing";
+    mainDisplay.className = "main-display looking";
+    hintText.textContent = "正在回头...松开结束记录";
+    hintText.className = "hint-text active";
+
+    displayInterval = setInterval(function() {
+      var elapsed = Date.now() - pressStartTime;
+      mainDisplay.textContent = formatTime(elapsed);
+    }, 33); // ~30fps update
+  }
+
+  function endPress() {
+    if (!isPressing) return;
+    isPressing = false;
+    clearInterval(displayInterval);
+    displayInterval = null;
+
+    var now = Date.now();
+    var duration = now - pressStartTime;
+    var startOffset = pressStartTime - classStartTime;
+    var endOffset = now - classStartTime;
+
+    // Calculate interval from end of last event to start of this one
+    var interval = 0;
+    if (events.length > 0) {
+      interval = startOffset - events[events.length - 1].endOffset;
+    } else {
+      interval = startOffset; // from class start
+    }
+
+    events.push({
+      startOffset: startOffset,
+      endOffset: endOffset,
+      duration: duration,
+      interval: interval
+    });
+
+    mainDisplay.textContent = formatTime(duration);
+    mainDisplay.className = "main-display";
+    timerZone.className = "timer-zone recording";
+    hintText.textContent = "长按屏幕记录下一次回头";
+    hintText.className = "hint-text";
+
+    updateEventList();
+    updateStats();
+  }
+
+  // ====== Statistics ======
+  function calcAO(values, n) {
+    // Average of n, removing best and worst
+    if (values.length < n) return -1;
+    var last = values.slice(-n);
+    last.sort(function(a, b) { return a - b; });
+    // Remove best (first) and worst (last)
+    var trimmed = last.slice(1, -1);
+    var sum = 0;
+    for (var i = 0; i < trimmed.length; i++) {
+      sum += trimmed[i];
+    }
+    return sum / trimmed.length;
+  }
+
+  function updateStats() {
+    var count = events.length;
+    statCount.textContent = String(count);
+    eventCount.textContent = count + " 次";
+
+    if (count === 0) {
+      setStatNA("statAvgDuration");
+      setStatNA("statAvgInterval");
+      setStatNA("statAO12Duration");
+      setStatNA("statAO12Interval");
+      setStatNA("statMaxDuration");
+      return;
+    }
+
+    // Global average duration
+    var sumDur = 0;
+    var maxDur = 0;
+    var durations = [];
+    var intervals = [];
+    for (var i = 0; i < count; i++) {
+      sumDur += events[i].duration;
+      durations.push(events[i].duration);
+      intervals.push(events[i].interval);
+      if (events[i].duration > maxDur) {
+        maxDur = events[i].duration;
+      }
+    }
+
+    var avgDur = sumDur / count;
+    setStatValue("statAvgDuration", formatTimeShort(avgDur));
+
+    // Global average interval
+    var sumInt = 0;
+    for (var j = 0; j < count; j++) {
+      sumInt += events[j].interval;
+    }
+    var avgInt = sumInt / count;
+    setStatValue("statAvgInterval", formatTimeShort(avgInt));
+
+    // Max duration
+    setStatValue("statMaxDuration", formatTimeShort(maxDur));
+
+    // AO12 Duration (last 12 durations, remove best and worst)
+    var ao12Dur = calcAO(durations, 12);
+    if (ao12Dur >= 0) {
+      setStatValue("statAO12Duration", formatTimeShort(ao12Dur));
+    } else {
+      setStatNA("statAO12Duration");
+    }
+
+    // AO12 Interval (last 12 intervals, remove best and worst)
+    var ao12Int = calcAO(intervals, 12);
+    if (ao12Int >= 0) {
+      setStatValue("statAO12Interval", formatTimeShort(ao12Int));
+    } else {
+      setStatNA("statAO12Interval");
+    }
+  }
+
+  function setStatValue(id, value) {
+    var el = document.getElementById(id);
+    el.textContent = value;
+    el.className = "value";
+  }
+
+  function setStatNA(id) {
+    var el = document.getElementById(id);
+    el.textContent = "N/A";
+    el.className = "value na";
+  }
+
+  // ====== Event List ======
+  function updateEventList() {
+    eventTableBody.innerHTML = "";
+    for (var i = events.length - 1; i >= 0; i--) {
+      var ev = events[i];
+      var tr = document.createElement("tr");
+
+      var tdNum = document.createElement("td");
+      tdNum.textContent = String(i + 1);
+      tr.appendChild(tdNum);
+
+      var tdStart = document.createElement("td");
+      tdStart.textContent = formatTime(ev.startOffset);
+      tr.appendChild(tdStart);
+
+      var tdDur = document.createElement("td");
+      tdDur.textContent = formatTimeShort(ev.duration);
+      tr.appendChild(tdDur);
+
+      var tdInt = document.createElement("td");
+      tdInt.textContent = formatTimeShort(ev.interval);
+      tr.appendChild(tdInt);
+
+      eventTableBody.appendChild(tr);
+    }
+  }
+
+  // ====== CSV Export ======
+  function generateCSV() {
+    var lines = [];
+    lines.push("序号,回头开始时间(ms),回头结束时间(ms),回头时长(ms),回头间隔(ms),回头开始时间,回头时长(s),回头间隔(s)");
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      lines.push([
+        i + 1,
+        ev.startOffset,
+        ev.endOffset,
+        ev.duration,
+        ev.interval,
+        formatTime(ev.startOffset),
+        (ev.duration / 1000).toFixed(3),
+        (ev.interval / 1000).toFixed(3)
+      ].join(","));
+    }
+
+    // Add summary
+    lines.push("");
+    lines.push("统计摘要");
+    lines.push("回头次数," + events.length);
+
+    if (events.length > 0) {
+      var sumDur = 0, sumInt = 0, maxDur = 0;
+      var durations = [], intervals = [];
+      for (var j = 0; j < events.length; j++) {
+        sumDur += events[j].duration;
+        sumInt += events[j].interval;
+        durations.push(events[j].duration);
+        intervals.push(events[j].interval);
+        if (events[j].duration > maxDur) maxDur = events[j].duration;
+      }
+      lines.push("全局平均回头时长(s)," + (sumDur / events.length / 1000).toFixed(3));
+      lines.push("全局平均回头间隔(s)," + (sumInt / events.length / 1000).toFixed(3));
+      lines.push("最长回头(s)," + (maxDur / 1000).toFixed(3));
+
+      var ao12Dur = calcAO(durations, 12);
+      var ao12Int = calcAO(intervals, 12);
+      lines.push("AO12时长(s)," + (ao12Dur >= 0 ? (ao12Dur / 1000).toFixed(3) : "N/A"));
+      lines.push("AO12间隔(s)," + (ao12Int >= 0 ? (ao12Int / 1000).toFixed(3) : "N/A"));
+
+      lines.push("上课开始时间," + new Date(classStartTime).toLocaleString());
+      lines.push("记录总时长(s)," + ((events[events.length - 1].endOffset) / 1000).toFixed(1));
+    }
+
+    return lines.join("\n");
+  }
+
+  function exportCSV() {
+    if (events.length === 0) {
+      showToast("没有记录可导出");
+      return;
+    }
+
+    var csv = generateCSV();
+    var BOM = "\uFEFF";
+    var blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8" });
+    var timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    var filename = "lookback_record_" + timestamp + ".csv";
+
+    // Download the file
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Store to localStorage as a backup
+    try {
+      var records = JSON.parse(localStorage.getItem("lookback_records") || "[]");
+      records.push({
+        timestamp: Date.now(),
+        filename: filename,
+        events: events.slice(),
+        classStartTime: classStartTime
+      });
+      // Keep last 50 records
+      if (records.length > 50) {
+        records = records.slice(-50);
+      }
+      localStorage.setItem("lookback_records", JSON.stringify(records));
+    } catch (e) {
+      // localStorage may not be available
+    }
+
+    showToast("CSV 已导出: " + filename);
+  }
+
+  function clearRecords() {
+    if (events.length === 0) return;
+    if (!confirm("确定要清空所有记录吗？")) return;
+
+    events = [];
+    updateEventList();
+    updateStats();
+    mainDisplay.textContent = "00:00.000";
+    showToast("记录已清空");
+  }
+
+  // ====== Event Listeners ======
+  startBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    startClass();
+  });
+
+  stopBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    stopClass();
+  });
+
+  exportCsvBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    exportCSV();
+  });
+
+  clearBtn.addEventListener("click", function(e) {
+    e.preventDefault();
+    clearRecords();
+  });
+
+  // Touch events for long-press recording
+  timerZone.addEventListener("touchstart", function(e) {
+    if (e.target === startBtn || e.target === stopBtn) return;
+    e.preventDefault();
+    startPress();
+  }, { passive: false });
+
+  timerZone.addEventListener("touchend", function(e) {
+    if (e.target === startBtn || e.target === stopBtn) return;
+    e.preventDefault();
+    endPress();
+  }, { passive: false });
+
+  timerZone.addEventListener("touchcancel", function(e) {
+    e.preventDefault();
+    endPress();
+  }, { passive: false });
+
+  // Mouse events for desktop testing
+  timerZone.addEventListener("mousedown", function(e) {
+    if (e.target === startBtn || e.target === stopBtn) return;
+    if (e.button !== 0) return;
+    startPress();
+  });
+
+  timerZone.addEventListener("mouseup", function(e) {
+    if (e.target === startBtn || e.target === stopBtn) return;
+    endPress();
+  });
+
+  timerZone.addEventListener("mouseleave", function() {
+    if (isPressing) {
+      endPress();
+    }
+  });
+
+  // Prevent context menu on long press (mobile)
+  timerZone.addEventListener("contextmenu", function(e) {
+    e.preventDefault();
+  });
+
+})();
+</script>
+</body>
+</html>
