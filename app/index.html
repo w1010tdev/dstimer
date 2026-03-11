@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <title>回头记录工具 - 课堂观察研究</title>
+  <title>猛回头</title>
   <style>
     * {
       margin: 0;
@@ -442,14 +442,218 @@
         font-size: 5em;
       }
     }
+
+    /* ====== Custom On-Screen Keyboard ====== */
+    .keyboard-overlay {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0d1829;
+      border-top: 2px solid #0f3460;
+      padding: 8px 6px 16px;
+      z-index: 10001;
+      box-shadow: 0 -6px 24px rgba(0,0,0,0.7);
+      animation: kb-up 0.15s ease-out;
+    }
+
+    @keyframes kb-up {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .kb-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 4px 8px;
+    }
+
+    .kb-preview {
+      flex: 1;
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 0.95em;
+      color: #e0e0e0;
+      font-family: "Courier New", monospace;
+      min-height: 34px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      letter-spacing: 2px;
+    }
+
+    .kb-close-btn {
+      background: #1a2a4a;
+      color: #aaa;
+      border: 1px solid #0f3460;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 0.85em;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .kb-row {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+
+    .kb-key {
+      background: #16213e;
+      color: #e0e0e0;
+      border: 1px solid #1a3a6e;
+      border-radius: 6px;
+      font-size: 1em;
+      font-weight: bold;
+      height: 42px;
+      flex: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background 0.08s;
+    }
+
+    .kb-key:active {
+      background: #0f3460;
+      border-color: #2a5a9e;
+    }
+
+    .kb-backspace {
+      background: #201520;
+      color: #e94560;
+      flex: 1.4;
+    }
+
+    .kb-confirm {
+      background: #e94560;
+      color: white;
+      border-color: #e94560;
+      flex: 1.5;
+    }
+
+    .kb-confirm:active {
+      background: #c63450 !important;
+    }
+
+    /* Numpad — bigger keys */
+    .kb-numpad .kb-row {
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .kb-numpad .kb-key {
+      font-size: 1.5em;
+      height: 58px;
+      flex: none;
+      width: calc(33.33% - 8px);
+      max-width: 110px;
+    }
   </style>
 </head>
 <body>
 
+<!-- Custom On-Screen Keyboard -->
+<div class="keyboard-overlay" id="keyboardOverlay" style="display:none;">
+  <div class="kb-header">
+    <div class="kb-preview" id="kbPreview">&nbsp;</div>
+    <button class="kb-close-btn" id="kbCloseBtn">收起</button>
+  </div>
+
+  <!-- Numpad (password) -->
+  <div class="kb-numpad" id="kbNumpad">
+    <div class="kb-row">
+      <button class="kb-key" data-k="1">1</button>
+      <button class="kb-key" data-k="2">2</button>
+      <button class="kb-key" data-k="3">3</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-k="4">4</button>
+      <button class="kb-key" data-k="5">5</button>
+      <button class="kb-key" data-k="6">6</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-k="7">7</button>
+      <button class="kb-key" data-k="8">8</button>
+      <button class="kb-key" data-k="9">9</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key kb-backspace" data-a="bs">⌫</button>
+      <button class="kb-key" data-k="0">0</button>
+      <button class="kb-key kb-confirm" data-a="ok">✓</button>
+    </div>
+  </div>
+
+  <!-- Full keyboard (URL / text) -->
+  <div class="kb-full" id="kbFull" style="display:none;">
+    <div class="kb-row">
+      <button class="kb-key" data-k="1">1</button>
+      <button class="kb-key" data-k="2">2</button>
+      <button class="kb-key" data-k="3">3</button>
+      <button class="kb-key" data-k="4">4</button>
+      <button class="kb-key" data-k="5">5</button>
+      <button class="kb-key" data-k="6">6</button>
+      <button class="kb-key" data-k="7">7</button>
+      <button class="kb-key" data-k="8">8</button>
+      <button class="kb-key" data-k="9">9</button>
+      <button class="kb-key" data-k="0">0</button>
+      <button class="kb-key kb-backspace" data-a="bs">⌫</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-k="q">q</button>
+      <button class="kb-key" data-k="w">w</button>
+      <button class="kb-key" data-k="e">e</button>
+      <button class="kb-key" data-k="r">r</button>
+      <button class="kb-key" data-k="t">t</button>
+      <button class="kb-key" data-k="y">y</button>
+      <button class="kb-key" data-k="u">u</button>
+      <button class="kb-key" data-k="i">i</button>
+      <button class="kb-key" data-k="o">o</button>
+      <button class="kb-key" data-k="p">p</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-k="a">a</button>
+      <button class="kb-key" data-k="s">s</button>
+      <button class="kb-key" data-k="d">d</button>
+      <button class="kb-key" data-k="f">f</button>
+      <button class="kb-key" data-k="g">g</button>
+      <button class="kb-key" data-k="h">h</button>
+      <button class="kb-key" data-k="j">j</button>
+      <button class="kb-key" data-k="k">k</button>
+      <button class="kb-key" data-k="l">l</button>
+      <button class="kb-key" data-k=":">:</button>
+      <button class="kb-key" data-k="/">/</button>
+    </div>
+    <div class="kb-row">
+      <button class="kb-key" data-k="z">z</button>
+      <button class="kb-key" data-k="x">x</button>
+      <button class="kb-key" data-k="c">c</button>
+      <button class="kb-key" data-k="v">v</button>
+      <button class="kb-key" data-k="b">b</button>
+      <button class="kb-key" data-k="n">n</button>
+      <button class="kb-key" data-k="m">m</button>
+      <button class="kb-key" data-k=".">.</button>
+      <button class="kb-key" data-k="-">-</button>
+      <button class="kb-key" data-k="_">_</button>
+      <button class="kb-key kb-confirm" data-a="ok">✓</button>
+    </div>
+  </div>
+</div>
+
 <!-- Password Gate -->
 <div class="password-overlay" id="passwordOverlay">
   <h2>请输入密码</h2>
-  <input type="password" id="passwordInput" placeholder="输入密码" maxlength="10" autocomplete="off">
+  <input type="password" id="passwordInput" placeholder="输入密码" maxlength="10" autocomplete="off" readonly>
   <button class="pw-btn" id="passwordBtn">确认</button>
   <div class="pw-error" id="passwordError"></div>
 </div>
@@ -532,7 +736,7 @@
 
     <div class="server-config">
       <label>后端服务器地址</label>
-      <input type="text" id="serverUrl" placeholder="例如 http://localhost:5000" value="">
+      <input type="text" id="serverUrl" value="" readonly>
       <div class="sync-status" id="syncStatus">未配置服务器</div>
     </div>
   </div>
@@ -559,7 +763,7 @@
     } else {
       passwordError.textContent = "密码错误，请重试";
       passwordInput.value = "";
-      passwordInput.focus();
+      showKb(passwordInput);
     }
   }
 
@@ -607,11 +811,13 @@
   var serverUrlInput = document.getElementById("serverUrl");
   var syncStatusEl = document.getElementById("syncStatus");
 
-  // Restore saved server URL
+  // Restore saved server URL, default to current origin
   try {
     var savedUrl = localStorage.getItem("lookback_server_url");
-    if (savedUrl) serverUrlInput.value = savedUrl;
-  } catch (e) {}
+    serverUrlInput.value = savedUrl || window.location.origin;
+  } catch (e) {
+    serverUrlInput.value = window.location.origin;
+  }
 
   serverUrlInput.addEventListener("change", function() {
     try {
@@ -1086,6 +1292,98 @@
 
   timerZone.addEventListener("contextmenu", function(e) {
     e.preventDefault();
+  });
+
+  // ====== Custom On-Screen Keyboard ======
+  var kbOverlay   = document.getElementById("keyboardOverlay");
+  var kbNumpad    = document.getElementById("kbNumpad");
+  var kbFull      = document.getElementById("kbFull");
+  var kbPreviewEl = document.getElementById("kbPreview");
+  var kbCloseBtnEl = document.getElementById("kbCloseBtn");
+  var activeKbInp = null;
+  var activeKbIsPw = false;
+
+  function updateKbPreview() {
+    if (!activeKbInp) return;
+    if (activeKbIsPw) {
+      kbPreviewEl.textContent = activeKbInp.value.length > 0
+        ? "\u25cf".repeat(activeKbInp.value.length)
+        : "\u00a0";
+    } else {
+      kbPreviewEl.textContent = activeKbInp.value || "\u00a0";
+    }
+  }
+
+  function showKb(inp) {
+    activeKbInp = inp;
+    activeKbIsPw = inp.type === "password";
+    if (activeKbIsPw) {
+      kbNumpad.style.display = "block";
+      kbFull.style.display = "none";
+    } else {
+      kbNumpad.style.display = "none";
+      kbFull.style.display = "block";
+    }
+    updateKbPreview();
+    kbOverlay.style.display = "block";
+  }
+
+  function hideKb() {
+    kbOverlay.style.display = "none";
+    if (activeKbInp) {
+      activeKbInp.dispatchEvent(new Event("change"));
+    }
+    activeKbInp = null;
+  }
+
+  function attachKbToInput(inp) {
+    function openKb(e) {
+      e.preventDefault();
+      showKb(inp);
+    }
+    inp.addEventListener("touchstart", openKb, { passive: false });
+    inp.addEventListener("mousedown", openKb);
+  }
+
+  attachKbToInput(passwordInput);
+  attachKbToInput(serverUrlInput);
+
+  kbCloseBtnEl.addEventListener("touchstart", function(e) {
+    e.preventDefault();
+    hideKb();
+  }, { passive: false });
+  kbCloseBtnEl.addEventListener("click", function(e) {
+    e.preventDefault();
+    hideKb();
+  });
+
+  kbOverlay.querySelectorAll(".kb-key").forEach(function(btn) {
+    function handleKbKey(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!activeKbInp) return;
+      var k = btn.getAttribute("data-k");
+      var a = btn.getAttribute("data-a");
+      if (k !== null) {
+        var maxLen = parseInt(activeKbInp.getAttribute("maxlength") || "9999");
+        if (activeKbInp.value.length < maxLen) {
+          activeKbInp.value += k;
+          updateKbPreview();
+        }
+      } else if (a === "bs") {
+        activeKbInp.value = activeKbInp.value.slice(0, -1);
+        updateKbPreview();
+      } else if (a === "ok") {
+        if (activeKbIsPw) {
+          hideKb();
+          checkPassword();
+        } else {
+          hideKb();
+        }
+      }
+    }
+    btn.addEventListener("touchstart", handleKbKey, { passive: false });
+    btn.addEventListener("click", handleKbKey);
   });
 
 })();

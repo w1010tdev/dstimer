@@ -7,9 +7,16 @@ app = Flask(__name__)
 CORS(app)
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+APP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app")
 PASSWORD = "2427"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@app.route("/")
+def index():
+    """Serve the frontend index.html."""
+    return send_from_directory(os.path.abspath(APP_DIR), "index.html")
 
 
 @app.route("/api/upload", methods=["POST"])
